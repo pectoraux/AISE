@@ -7,7 +7,7 @@ on:
 
 jobs:
   foundation:
-    name: Foundation verify (lint, typecheck, test, smoke, web build)
+    name: Foundation verify (npm run verify)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -22,17 +22,9 @@ jobs:
       - name: Install dependencies (exact, from lockfile)
         run: npm ci
 
-      - name: Lint (eslint)
-        run: npm run lint
-
-      - name: Typecheck (tsc --noEmit, all workspaces)
-        run: npm run typecheck
-
-      - name: Unit tests (vitest, all backend workspaces)
-        run: npm test
-
-      - name: Foundation smoke (startup, routing, fail-safe config, graceful shutdown)
-        run: npm run smoke
-
-      - name: Build web app (next build)
-        run: npm run build:web
+      # Single authoritative verification entry point.
+      # package.json scripts.verify is the only place the stage list is
+      # defined (lint + typecheck + test + smoke + build:web). The smoke
+      # suite regression-guards this file against package.json/README drift.
+      - name: Verify (lint, typecheck, test, smoke, web build)
+        run: npm run verify

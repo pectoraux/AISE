@@ -11,10 +11,16 @@
  *   4. worker process boots, is polling (debug `worker.poll` records), and
  *      shuts down gracefully on SIGTERM (exit 0).
  *
+ * Additionally guards the repository verification contract (static checks):
+ *   5. verification contract — `package.json` `scripts.verify` is the single
+ *      authoritative verification command; CI invokes it verbatim (no
+ *      second, independent stage list); README documents the same stages —
+ *      so the three surfaces cannot silently diverge.
+ *
  * Exit code 0 means every check passed; any failure exits 1.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import process from "node:process";
 
@@ -36,6 +42,9 @@ interface SpawnedService {
 
 const root = path.resolve(import.meta.dirname, "..");
 const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+
+/** The canonical verification stages, in the order `npm run verify` runs them. */
+const VERIFICATION_STAGES = ["lint", "typecheck", "test", "smoke", "build:web"] as const;
 
 function fail(message: string): never {
   throw new Error(message);
@@ -160,6 +169,61 @@ async function checkConfigHygiene(): Promise<void> {
   console.log("smoke: config hygiene OK (.env.example present, no .env* tracked)");
 }
 
+async function checkVerificationContract(): Promise<void> {
+  // The repository must keep exactly one verification contract:
+  //   - package.json scripts.verify is the authoritative stage chain;
+  //   - .github/workflows/ci.yml invokes `npm run verify` verbatim and must
+  //     not run verification stages directly (no second definition);
+  //   - README.md documents the same stages and the "exactly what CI runs"
+  //     claim.
+  // Any divergence between these surfaces fails here — locally via
+  // `npm run smoke`, and in CI via `npm run verify`.
+  const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
+    scripts?: Record<string, string>;
+  };
+  const verifyScript = pkg.scripts?.verify ?? fail("verification contract failed: package.json must define scripts.verify");
+  const invokedStages = [...verifyScript.matchAll(/npm run ([^\s&]+)/g)].map((match) => match[1]);
+  const expectedStages: readonly string[] = VERIFICATION_STAGES;
+  assert(
+    JSON.stringify(invokedStages) === JSON.stringify(expectedStages),
+    `verification contract failed: scripts.verify must chain exactly ${expectedStages.join(" + ")} in order (found: ${invokedStages.join(" + ") || "nothing"})`,
+  );
+
+  const ciYaml = readFileSync(path.join(root, ".github", "workflows", "ci.yml"), "utf8");
+  const runSteps = [...ciYaml.matchAll(/run:\s*(.+)$/gm)].map((match) => match[1].trim());
+  assert(
+    runSteps.includes("npm run verify"),
+    "verification contract failed: .github/workflows/ci.yml must invoke `npm run verify` as the single verification entry point",
+  );
+  const directlyRunStages = runSteps.filter((step) =>
+    VERIFICATION_STAGES.some(
+      (stage) => step === `npm run ${stage}` || step === `npm ${stage}`,
+    ),
+  );
+  assert(
+    directlyRunStages.length === 0,
+    `verification contract failed: ci.yml must not run verification stages directly (${directlyRunStages.join(", ")}) — stages are defined only in scripts.verify`,
+  );
+
+  const readme = readFileSync(path.join(root, "README.md"), "utf8");
+  const verifyRow =
+    readme.split("\n").find((line) => line.startsWith("| `npm run verify` |")) ??
+    fail("verification contract failed: README.md must document `npm run verify` in the commands table");
+  const expectedSummary = expectedStages.join(" + ");
+  assert(
+    verifyRow.includes(expectedSummary),
+    `verification contract failed: README \`npm run verify\` row must list ${expectedSummary}`,
+  );
+  assert(
+    verifyRow.includes("exactly what CI runs"),
+    "verification contract failed: README `npm run verify` row must state that it is exactly what CI runs",
+  );
+
+  console.log(
+    `smoke: verification contract OK (package.json verify == CI entry point == README: ${expectedSummary})`,
+  );
+}
+
 async function smokeApi(): Promise<void> {
   const port = process.env.AISE_SMOKE_API_PORT ?? "8231";
   const api = spawnService("backend/services/api/src/main.ts", {
@@ -261,6 +325,7 @@ async function main(): Promise<void> {
   );
 
   await checkConfigHygiene();
+  await checkVerificationContract();
   await smokeApi();
   await smokeFailSafeConfig();
   await smokeWorker();

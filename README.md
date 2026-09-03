@@ -37,7 +37,7 @@ Directory mapping: `backend/services/**` implements the Z.ai-owned `services/**`
 
 ## Local development
 
-Prerequisites: Node.js ≥ 24 (LTS) and npm. The exact commands below are identical locally and in CI (`.github/workflows/ci.yml`).
+Prerequisites: Node.js (minimum 22, declared by `engines.node`; CI and the reference toolchain run Node 24 LTS) and npm. The exact commands below are identical locally and in CI (`.github/workflows/ci.yml`).
 
 ```bash
 npm ci                 # install exactly from package-lock.json
@@ -54,9 +54,13 @@ cp .env.example .env   # optional: gitignored local configuration
 | `npm test` | Unit tests (Vitest), all backend workspaces |
 | `npm run smoke` | Real-process smoke: startup, routing, fail-safe config, graceful shutdown |
 | `npm run build:web` | Production build of the web app |
-| `npm run verify` | lint + typecheck + test + smoke (exactly what CI runs) |
+| `npm run verify` | lint + typecheck + test + smoke + build:web (exactly what CI runs) |
 
 Configuration comes **only** from environment variables / a gitignored `.env` file (never from source). Missing or invalid required configuration (e.g. `AISE_ENV`) makes services fail closed: a structured `config.invalid` log record and exit code 1, never a silent default. See `.env.example`.
+
+### Verification contract
+
+`npm run verify` is the repository's single authoritative verification command: it chains lint + typecheck + test + smoke + build:web, in that order. CI (`.github/workflows/ci.yml`) runs exactly `npm run verify` — it does not maintain a second, independent list of verification stages — so the local command and the CI gate cannot drift apart. The smoke suite enforces this with a regression guard: if `package.json`, `ci.yml`, or this README ever disagree on the verification contract, `npm run smoke` (and therefore `npm run verify` and CI) fails.
 
 ## Foundation boundaries (AISE-001)
 

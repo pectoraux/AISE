@@ -78,6 +78,12 @@ dependencies {
     implementation("androidx.camera:camera-video:$cameraVersion")
     implementation("androidx.camera:camera-view:$cameraVersion")
 
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // OkHttp Networking
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Compose BOM & UI
     val composeBom = platform("androidx.compose:compose-bom:2024.04.01")
     implementation(composeBom)
@@ -110,7 +116,9 @@ dependencies {
     testImplementation("androidx.test.ext:junit:1.1.5")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.room:room-testing:$roomVersion")
-    
+    testImplementation("androidx.work:work-testing:2.9.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+
     // Connected Emulator / Device Instrumentation Testing
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  foundation:
+    name: Foundation verify (lint, typecheck, test, smoke, web build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies (exact, from lockfile)
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Typecheck (tsc --noEmit, all workspaces)
+        run: npm run typecheck
+
+      - name: Unit tests (vitest, all backend workspaces)
+        run: npm test
+
+      - name: Foundation smoke (startup, routing, fail-safe config, graceful shutdown)
+        run: npm run smoke
+
+      - name: Build web app (next build)
+        run: npm run build:web

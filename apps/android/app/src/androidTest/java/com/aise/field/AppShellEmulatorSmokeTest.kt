@@ -1,7 +1,8 @@
 package com.aise.field
 
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,21 +18,23 @@ import org.junit.runner.RunWith
 class AppShellEmulatorSmokeTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun fullAcceptancePath_emulatorSmokeTest() {
         val app = ApplicationProvider.getApplicationContext<AiseApplication>()
 
-        composeTestRule.setContent {
-            AiseTheme {
-                val navController = rememberNavController()
-                AiseNavGraph(
-                    navController = navController,
-                    projectStore = app.projectStore,
-                    captureStore = app.captureStore
-                )
+        composeTestRule.runOnUiThread {
+            composeTestRule.setContent {
+                AiseTheme {
+                    val navController = rememberNavController()
+                    AiseNavGraph(
+                        navController = navController,
+                        projectStore = app.projectStore,
+                        captureStore = app.captureStore
+                    )
+                }
             }
         }
 
